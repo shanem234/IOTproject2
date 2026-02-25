@@ -1,0 +1,101 @@
+#include <Wire.h>
+const int tempSensorPin = A0; 
+
+const int ledPin = 6; 
+
+const int buzzerPin = 5; 
+
+ 
+
+float temperature = 0; 
+
+unsigned long startTime = 0; 
+
+bool heaterOn = false; 
+
+const float thresholdTemp = 40.0; // adjust after testing 
+
+const unsigned long alertTime = 2700000; // 45 mins in ms 
+
+ 
+
+void setup() { 
+
+  Serial.begin(9600); 
+
+  pinMode(ledPin, OUTPUT); 
+
+  pinMode(buzzerPin, OUTPUT); 
+
+} 
+
+ 
+
+void loop() { 
+
+   
+
+  int sensorValue = analogRead(tempSensorPin); 
+
+   
+
+  // Convert to voltage 
+
+  float voltage = sensorValue * 5.0 / 1023.0; 
+
+   
+
+  // Convert to temperature (depends on Grove sensor model) 
+
+  temperature = (voltage - 0.5) * 100; 
+
+ 
+
+  Serial.print("Temperature: "); 
+
+  Serial.println(temperature); 
+
+ 
+
+  if (temperature > thresholdTemp) { 
+
+     
+
+    if (!heaterOn) { 
+
+      heaterOn = true; 
+
+      startTime = millis(); 
+
+    } 
+
+ 
+
+    if (millis() - startTime > alertTime) { 
+
+      digitalWrite(ledPin, HIGH); 
+
+      digitalWrite(buzzerPin, HIGH); 
+
+    } 
+
+ 
+
+  } else { 
+
+    heaterOn = false; 
+
+    digitalWrite(ledPin, LOW); 
+
+    digitalWrite(buzzerPin, LOW); 
+
+  } 
+
+ 
+
+  delay(1000); 
+}
+
+ 
+
+ 
