@@ -1,1 +1,1 @@
-This is a project for an Immersion Heater alert
+This is a project for an Immersion Heater Alert System
