@@ -12,8 +12,8 @@ rgb_lcd lcd;
 BlynkTimer timer;
 
 
-char ssid[] = "YOUR_WIFI_NAME";
-char pass[] = "YOUR_WIFI_PASSWORD";
+char ssid[] = "shane";
+char pass[] = "Shane123";
 
 
 const int tempPin = A0;
