@@ -11,41 +11,39 @@
 rgb_lcd lcd;
 BlynkTimer timer;
 
-// Wi-Fi credentials
+
 char ssid[] = "YOUR_WIFI_NAME";
 char pass[] = "YOUR_WIFI_PASSWORD";
 
-// Pin definitions
+
 const int tempPin = A0;
 const int ledPin = 6;
 const int buzzerPin = 5;
 
-// Thresholds
-const float thresholdTemp = 40.0;              // heater considered ON above this temp
-const float highTempWarning = 70.0;            // optional extra warning
-const unsigned long alertDuration = 10000;     // 10 seconds for demo
-// For real use, you might change this to 3600000 for 1 hour
 
-// State variables
+const float thresholdTemp = 40.0;             
+const float highTempWarning = 40.0;         
+const unsigned long alertDuration = 10000;     
+
+
+
 unsigned long heaterStartTime = 0;
 bool heaterOn = false;
 bool alertSent = false;
 
-// Function to read temperature
+
 float readTemperature() {
   int analogValue = analogRead(tempPin);
 
-  // Adjust depending on your board:
-  // ESP32 ADC is usually 0-4095 with 3.3V reference
+  
   float voltage = analogValue * (3.3 / 4095.0);
 
-  // If your sensor is LM35 style: 10mV per °C
+ 
   float temperature = voltage * 100.0;
 
   return temperature;
 }
 
-// Send readings to Blynk and update outputs
 void checkHeaterStatus() {
   float temperature = readTemperature();
   unsigned long runtimeMinutes = 0;
@@ -54,7 +52,7 @@ void checkHeaterStatus() {
   Serial.print("Temperature: ");
   Serial.println(temperature);
 
-  // LCD line 1
+
   lcd.setCursor(0, 0);
   lcd.print("Temp: ");
   lcd.print(temperature, 1);
@@ -72,7 +70,7 @@ void checkHeaterStatus() {
 
     runtimeMinutes = (millis() - heaterStartTime) / 60000;
 
-    // Local + cloud alert if heater left on too long
+   
     if (millis() - heaterStartTime > alertDuration) {
       digitalWrite(ledPin, HIGH);
 
@@ -85,7 +83,7 @@ void checkHeaterStatus() {
 
       alertMessage = "Warning: ON too long";
 
-      // Send one push/event only once per alert cycle
+    
       if (!alertSent) {
         Blynk.logEvent("heater_alert", "Immersion heater has been ON too long");
         alertSent = true;
@@ -96,7 +94,7 @@ void checkHeaterStatus() {
       alertMessage = "Heating normally";
     }
 
-    // Optional high temp warning
+    
     if (temperature > highTempWarning) {
       alertMessage = "High temp warning";
     }
@@ -114,13 +112,13 @@ void checkHeaterStatus() {
     alertMessage = "Safe";
   }
 
-  // Send values to Blynk dashboard
-  Blynk.virtualWrite(V0, temperature);               // Water Temp
-  Blynk.virtualWrite(V1, heaterOn ? 1 : 0);         // Heater Status
-  Blynk.virtualWrite(V2, runtimeMinutes);           // Runtime (mins)
-  Blynk.virtualWrite(V3, alertMessage);             // Alert label
+ 
+  Blynk.virtualWrite(V0, temperature);               
+  Blynk.virtualWrite(V1, heaterOn ? 1 : 0);         
+  Blynk.virtualWrite(V2, runtimeMinutes);           
+  Blynk.virtualWrite(V3, alertMessage);            
 
-  // Serial debug
+
   Serial.print("Heater status: ");
   Serial.println(heaterOn ? "ON" : "OFF");
 
@@ -140,7 +138,7 @@ void setup() {
   lcd.begin(16, 2);
   lcd.print("Connecting...");
   
-  // Connect to Blynk
+ 
   Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
 
   lcd.clear();
@@ -148,7 +146,7 @@ void setup() {
   delay(1500);
   lcd.clear();
 
-  // Run sensor check every 1 second
+  
   timer.setInterval(1000L, checkHeaterStatus);
 }
 
