@@ -1,0 +1,158 @@
+#define BLYNK_TEMPLATE_ID "YOUR_TEMPLATE_ID"
+#define BLYNK_TEMPLATE_NAME "Immersion Heater Alerter"
+#define BLYNK_AUTH_TOKEN "YOUR_AUTH_TOKEN"
+
+#include <WiFi.h>
+#include <BlynkSimpleEsp32.h>
+#include <Wire.h>
+#include <rgb_lcd.h>
+#include <math.h>
+
+rgb_lcd lcd;
+BlynkTimer timer;
+
+// Wi-Fi credentials
+char ssid[] = "YOUR_WIFI_NAME";
+char pass[] = "YOUR_WIFI_PASSWORD";
+
+// Pin definitions
+const int tempPin = A0;
+const int ledPin = 6;
+const int buzzerPin = 5;
+
+// Thresholds
+const float thresholdTemp = 40.0;              // heater considered ON above this temp
+const float highTempWarning = 70.0;            // optional extra warning
+const unsigned long alertDuration = 10000;     // 10 seconds for demo
+// For real use, you might change this to 3600000 for 1 hour
+
+// State variables
+unsigned long heaterStartTime = 0;
+bool heaterOn = false;
+bool alertSent = false;
+
+// Function to read temperature
+float readTemperature() {
+  int analogValue = analogRead(tempPin);
+
+  // Adjust depending on your board:
+  // ESP32 ADC is usually 0-4095 with 3.3V reference
+  float voltage = analogValue * (3.3 / 4095.0);
+
+  // If your sensor is LM35 style: 10mV per °C
+  float temperature = voltage * 100.0;
+
+  return temperature;
+}
+
+// Send readings to Blynk and update outputs
+void checkHeaterStatus() {
+  float temperature = readTemperature();
+  unsigned long runtimeMinutes = 0;
+  String alertMessage = "Safe";
+
+  Serial.print("Temperature: ");
+  Serial.println(temperature);
+
+  // LCD line 1
+  lcd.setCursor(0, 0);
+  lcd.print("Temp: ");
+  lcd.print(temperature, 1);
+  lcd.print(" C   ");
+
+  if (temperature > thresholdTemp) {
+    lcd.setCursor(0, 1);
+    lcd.print("Immersion is on");
+
+    if (!heaterOn) {
+      heaterOn = true;
+      heaterStartTime = millis();
+      alertSent = false;
+    }
+
+    runtimeMinutes = (millis() - heaterStartTime) / 60000;
+
+    // Local + cloud alert if heater left on too long
+    if (millis() - heaterStartTime > alertDuration) {
+      digitalWrite(ledPin, HIGH);
+
+      unsigned long currentTime = millis();
+      if ((currentTime / 500) % 2 == 0) {
+        digitalWrite(buzzerPin, HIGH);
+      } else {
+        digitalWrite(buzzerPin, LOW);
+      }
+
+      alertMessage = "Warning: ON too long";
+
+      // Send one push/event only once per alert cycle
+      if (!alertSent) {
+        Blynk.logEvent("heater_alert", "Immersion heater has been ON too long");
+        alertSent = true;
+      }
+    } else {
+      digitalWrite(ledPin, LOW);
+      digitalWrite(buzzerPin, LOW);
+      alertMessage = "Heating normally";
+    }
+
+    // Optional high temp warning
+    if (temperature > highTempWarning) {
+      alertMessage = "High temp warning";
+    }
+
+  } else {
+    heaterOn = false;
+    alertSent = false;
+    runtimeMinutes = 0;
+
+    digitalWrite(ledPin, LOW);
+    digitalWrite(buzzerPin, LOW);
+
+    lcd.setCursor(0, 1);
+    lcd.print("Normal          ");
+    alertMessage = "Safe";
+  }
+
+  // Send values to Blynk dashboard
+  Blynk.virtualWrite(V0, temperature);               // Water Temp
+  Blynk.virtualWrite(V1, heaterOn ? 1 : 0);         // Heater Status
+  Blynk.virtualWrite(V2, runtimeMinutes);           // Runtime (mins)
+  Blynk.virtualWrite(V3, alertMessage);             // Alert label
+
+  // Serial debug
+  Serial.print("Heater status: ");
+  Serial.println(heaterOn ? "ON" : "OFF");
+
+  Serial.print("Runtime (mins): ");
+  Serial.println(runtimeMinutes);
+
+  Serial.print("Alert: ");
+  Serial.println(alertMessage);
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(ledPin, OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
+
+  lcd.begin(16, 2);
+  lcd.print("Connecting...");
+  
+  // Connect to Blynk
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+
+  lcd.clear();
+  lcd.print("Temp Monitor");
+  delay(1500);
+  lcd.clear();
+
+  // Run sensor check every 1 second
+  timer.setInterval(1000L, checkHeaterStatus);
+}
+
+void loop() {
+  Blynk.run();
+  timer.run();
+}
