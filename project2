@@ -1,6 +1,6 @@
-#define BLYNK_TEMPLATE_ID "YOUR_TEMPLATE_ID"
-#define BLYNK_TEMPLATE_NAME "Immersion Heater Alerter"
-#define BLYNK_AUTH_TOKEN "YOUR_AUTH_TOKEN"
+#define BLYNK_TEMPLATE_ID "TMPL4hgQZ3JNf"
+#define BLYNK_TEMPLATE_NAME "immersion heater alerter"
+#define BLYNK_AUTH_TOKEN "6sUan8E8PoUxlvX-dtnrlgQwmgQ11AgV"
 
 #include <WiFi.h>
 #include <BlynkSimpleEsp32.h>
