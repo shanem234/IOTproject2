@@ -10,32 +10,21 @@
 
 rgb_lcd lcd;
 BlynkTimer timer;
-
-
 char ssid[] = "shane";
 char pass[] = "Shane123";
-
-
 const int tempPin = A0;
 const int ledPin = 6;
 const int buzzerPin = 5;
-
-
 const float thresholdTemp = 40.0;             
 const float highTempWarning = 40.0;         
 const unsigned long alertDuration = 10000;     
 
-
-
 unsigned long heaterStartTime = 0;
 bool heaterOn = false;
 bool alertSent = false;
-
-
 float readTemperature() {
   int analogValue = analogRead(tempPin);
 
-  
   float voltage = analogValue * (3.3 / 4095.0);
 
  
@@ -137,17 +126,12 @@ void setup() {
 
   lcd.begin(16, 2);
   lcd.print("Connecting...");
-  
- 
-  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
-
-  lcd.clear();
+   Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+ lcd.clear();
   lcd.print("Temp Monitor");
   delay(1500);
   lcd.clear();
-
-  
-  timer.setInterval(1000L, checkHeaterStatus);
+timer.setInterval(1000L, checkHeaterStatus);
 }
 
 void loop() {
