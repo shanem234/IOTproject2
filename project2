@@ -3,7 +3,7 @@
 #define BLYNK_AUTH_TOKEN "6sUan8E8PoUxlvX-dtnrlgQwmgQ11AgV"
 
 #include <WiFi.h>
-#include <BlynkSimpleEsp32.h>
+#include <BlynkSimpleWifi.h>
 #include <Wire.h>
 #include <rgb_lcd.h>
 #include <math.h>
