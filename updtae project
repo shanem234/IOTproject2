@@ -6,6 +6,7 @@
 #include <Wire.h>
 #include <rgb_lcd.h>
 #include <math.h>
+#include <HTTPClient.h>        // NEW: for sending data to Google Sheets
 
 rgb_lcd lcd;
 BlynkTimer timer;
@@ -13,20 +14,51 @@ BlynkTimer timer;
 char ssid[] = "shane";
 char pass[] = "Shane123";
 
-const int tempPin    = A0;
-const int ledPin     = 6;
-const int buzzerPin  = 5;
-const int buttonPin  = 4;          // NEW: button on pin 4
+const int tempPin   = A0;
+const int ledPin    = 6;
+const int buzzerPin = 5;
+const int buttonPin = 4;
 
-const float thresholdTemp    = 40.0;
-const float highTempWarning  = 70.0;  // FIXED: was 40.0
+const float thresholdTemp   = 40.0;
+const float highTempWarning = 70.0;
 const unsigned long alertDuration = 10000;
+
+// NEW: paste your deployed Web App URL here
+const char* sheetsURL = "https://script.google.com/macros/s/AKfycbxKzS4Vm4CsIasPJKofIUxkaWy-sidcOJSvTR0M_6gP6Bt26OaKQUkz3QxF8xq6uauC/exec";
 
 unsigned long heaterStartTime = 0;
 bool heaterOn   = false;
 bool alertSent  = false;
-bool alertMuted = false;           // NEW: mute state
-int lastButtonState = HIGH;        // NEW: for edge detection
+bool alertMuted = false;
+int lastButtonState = HIGH;
+
+// NEW: only log to Sheets every 60 seconds, not every second
+unsigned long lastSheetLog = 0;
+const unsigned long sheetInterval = 300000; // 5 minutes in milliseconds
+
+// NEW FUNCTION — sends one row to Google Sheets
+void logToSheets(float temperature, bool heaterOn, bool alertMuted, unsigned long runtimeMinutes) {
+  if (WiFi.status() != WL_CONNECTED) return;  // skip if WiFi dropped
+
+  HTTPClient http;
+  http.begin(sheetsURL);
+  http.addHeader("Content-Type", "application/json");
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS); // Google redirects once
+
+  String payload = "{";
+  payload += "\"temperature\":"    + String(temperature, 1) + ",";
+  payload += "\"heaterStatus\":\""  + String(heaterOn ? "ON" : "OFF") + "\",";
+  payload += "\"alertMuted\":"     + String(alertMuted ? "true" : "false") + ",";
+  payload += "\"runtimeMinutes\":" + String(runtimeMinutes);
+  payload += "}";
+
+  int responseCode = http.POST(payload);
+
+  Serial.print("Sheets log status: ");
+  Serial.println(responseCode);
+
+  http.end();
+}
 
 void checkButton() {
   int currentState = digitalRead(buttonPin);
@@ -75,13 +107,13 @@ void checkHeaterStatus() {
       heaterOn        = true;
       heaterStartTime = millis();
       alertSent       = false;
-      alertMuted      = false;    // NEW: reset mute on fresh start
+      alertMuted      = false;
     }
 
     runtimeMinutes = (millis() - heaterStartTime) / 60000;
 
     if (millis() - heaterStartTime > alertDuration) {
-      if (!alertMuted) {          // NEW: respect mute
+      if (!alertMuted) {
         digitalWrite(ledPin, HIGH);
         unsigned long currentTime = millis();
         if ((currentTime / 500) % 2 == 0) {
@@ -108,7 +140,7 @@ void checkHeaterStatus() {
   } else {
     heaterOn   = false;
     alertSent  = false;
-    alertMuted = false;           // NEW: reset mute when heater off
+    alertMuted = false;
     runtimeMinutes = 0;
     digitalWrite(ledPin, LOW);
     digitalWrite(buzzerPin, LOW);
@@ -121,13 +153,19 @@ void checkHeaterStatus() {
   Blynk.virtualWrite(V1, heaterOn ? 1 : 0);
   Blynk.virtualWrite(V2, runtimeMinutes);
   Blynk.virtualWrite(V3, alertMessage);
+
+  // NEW: log to Google Sheets every 60 seconds
+  if (millis() - lastSheetLog >= sheetInterval) {
+    logToSheets(temperature, heaterOn, alertMuted, runtimeMinutes);
+    lastSheetLog = millis();
+  }
 }
 
 void setup() {
   Serial.begin(115200);
   pinMode(ledPin,    OUTPUT);
   pinMode(buzzerPin, OUTPUT);
-  pinMode(buttonPin, INPUT_PULLUP);  // NEW: no resistor needed
+  pinMode(buttonPin, INPUT_PULLUP);
 
   lcd.begin(16, 2);
   lcd.print("Connecting...");
@@ -139,7 +177,7 @@ void setup() {
   lcd.clear();
 
   timer.setInterval(1000L, checkHeaterStatus);
-  timer.setInterval(100L,  checkButton);  // NEW: polls button 10x/sec
+  timer.setInterval(100L,  checkButton);
 }
 
 void loop() {
