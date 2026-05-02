@@ -1,0 +1,148 @@
+#define BLYNK_TEMPLATE_ID "TMPL4hgQZ3JNf"
+#define BLYNK_TEMPLATE_NAME "immersion heater alerter"
+#define BLYNK_AUTH_TOKEN "6sUan8E8PoUxlvX-dtnrlgQwmgQ11AgV"
+#include <WiFi.h>
+#include <BlynkSimpleEsp32.h>
+#include <Wire.h>
+#include <rgb_lcd.h>
+#include <math.h>
+
+rgb_lcd lcd;
+BlynkTimer timer;
+
+char ssid[] = "shane";
+char pass[] = "Shane123";
+
+const int tempPin    = A0;
+const int ledPin     = 6;
+const int buzzerPin  = 5;
+const int buttonPin  = 4;          // NEW: button on pin 4
+
+const float thresholdTemp    = 40.0;
+const float highTempWarning  = 70.0;  // FIXED: was 40.0
+const unsigned long alertDuration = 10000;
+
+unsigned long heaterStartTime = 0;
+bool heaterOn   = false;
+bool alertSent  = false;
+bool alertMuted = false;           // NEW: mute state
+int lastButtonState = HIGH;        // NEW: for edge detection
+
+void checkButton() {
+  int currentState = digitalRead(buttonPin);
+  if (lastButtonState == HIGH && currentState == LOW) {
+    if (alertMuted) {
+      alertMuted = false;
+      alertSent  = false;
+      lcd.setCursor(0, 1);
+      lcd.print("Alert on again  ");
+      delay(1000);
+    } else {
+      alertMuted = true;
+      digitalWrite(ledPin, LOW);
+      digitalWrite(buzzerPin, LOW);
+      lcd.setCursor(0, 1);
+      lcd.print("Alert muted!    ");
+      delay(1000);
+    }
+    Blynk.virtualWrite(V4, alertMuted ? 1 : 0);
+  }
+  lastButtonState = currentState;
+}
+
+float readTemperature() {
+  int analogValue   = analogRead(tempPin);
+  float voltage     = analogValue * (3.3 / 4095.0);
+  float temperature = voltage * 100.0;
+  return temperature;
+}
+
+void checkHeaterStatus() {
+  float temperature        = readTemperature();
+  unsigned long runtimeMinutes = 0;
+  String alertMessage      = "Safe";
+
+  lcd.setCursor(0, 0);
+  lcd.print("Temp: ");
+  lcd.print(temperature, 1);
+  lcd.print(" C   ");
+
+  if (temperature > thresholdTemp) {
+    lcd.setCursor(0, 1);
+    lcd.print("Immersion is on");
+
+    if (!heaterOn) {
+      heaterOn        = true;
+      heaterStartTime = millis();
+      alertSent       = false;
+      alertMuted      = false;    // NEW: reset mute on fresh start
+    }
+
+    runtimeMinutes = (millis() - heaterStartTime) / 60000;
+
+    if (millis() - heaterStartTime > alertDuration) {
+      if (!alertMuted) {          // NEW: respect mute
+        digitalWrite(ledPin, HIGH);
+        unsigned long currentTime = millis();
+        if ((currentTime / 500) % 2 == 0) {
+          digitalWrite(buzzerPin, HIGH);
+        } else {
+          digitalWrite(buzzerPin, LOW);
+        }
+      }
+      alertMessage = "Warning: ON too long";
+      if (!alertSent && !alertMuted) {
+        Blynk.logEvent("heater_alert", "Immersion heater has been ON too long");
+        alertSent = true;
+      }
+    } else {
+      digitalWrite(ledPin, LOW);
+      digitalWrite(buzzerPin, LOW);
+      alertMessage = "Heating normally";
+    }
+
+    if (temperature > highTempWarning) {
+      alertMessage = "High temp warning";
+    }
+
+  } else {
+    heaterOn   = false;
+    alertSent  = false;
+    alertMuted = false;           // NEW: reset mute when heater off
+    runtimeMinutes = 0;
+    digitalWrite(ledPin, LOW);
+    digitalWrite(buzzerPin, LOW);
+    lcd.setCursor(0, 1);
+    lcd.print("Normal          ");
+    alertMessage = "Safe";
+  }
+
+  Blynk.virtualWrite(V0, temperature);
+  Blynk.virtualWrite(V1, heaterOn ? 1 : 0);
+  Blynk.virtualWrite(V2, runtimeMinutes);
+  Blynk.virtualWrite(V3, alertMessage);
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(ledPin,    OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
+  pinMode(buttonPin, INPUT_PULLUP);  // NEW: no resistor needed
+
+  lcd.begin(16, 2);
+  lcd.print("Connecting...");
+
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+  lcd.clear();
+  lcd.print("Temp Monitor");
+  delay(1500);
+  lcd.clear();
+
+  timer.setInterval(1000L, checkHeaterStatus);
+  timer.setInterval(100L,  checkButton);  // NEW: polls button 10x/sec
+}
+
+void loop() {
+  Blynk.run();
+  timer.run();
+}
