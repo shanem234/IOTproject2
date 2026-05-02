@@ -17,7 +17,7 @@ char pass[] = "Shane123";
 const int tempPin = A0;
 const int ledPin = 6;
 const int buzzerPin = 5;
-const int relayPin = 7;       // Relay pin for immersion ON/OFF
+const int relayPin = 7;       
 
 const float thresholdTemp = 40.0;
 const float highTempWarning = 40.0;
@@ -26,8 +26,7 @@ const unsigned long alertDuration = 10000;
 unsigned long heaterStartTime = 0;
 bool heaterOn = false;
 bool alertSent = false;
-bool immersionCommand = false;   // Controlled by Blynk button
-
+bool immersionCommand = false;   
 float readTemperature() {
   int analogValue = analogRead(tempPin);
 
@@ -37,14 +36,14 @@ float readTemperature() {
   return temperature;
 }
 
-// Blynk button on V4
+
 BLYNK_WRITE(V4) {
   immersionCommand = param.asInt();
 
   if (immersionCommand) {
-    digitalWrite(relayPin, HIGH);   // Turn immersion ON
+    digitalWrite(relayPin, HIGH);   
   } else {
-    digitalWrite(relayPin, LOW);    // Turn immersion OFF
+    digitalWrite(relayPin, LOW);    
   }
 }
 
